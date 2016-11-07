@@ -32,36 +32,89 @@
 #include "softdevice_handler.h"
 #include "app_timer.h"
 #include "app_button.h"
-#include "ble_nus.h"
+#ifdef NUS_TEST
+    #include "ble_nus.h"
+#endif
 #include "app_uart.h"
 #include "app_util_platform.h"
 #include "bsp.h"
 #include "bsp_btn_ble.h"
 
+#define TEST_TUT5
+#ifdef TEST_TUT5
+//#include "app_error.h"
+#include "ble.h"
+//#include "ble_hci.h"
+//#include "ble_srv_common.h"
+//#include "ble_advdata.h"
+//#include "ble_advertising.h"
+//#include "ble_conn_params.h"
+//#include "boards.h"
+//#include "softdevice_handler.h"
+//#include "app_timer.h"
+//#include "device_manager.h"
+//#include "pstorage.h"
+//#include "app_trace.h"
+//#include "bsp.h"
+//#include "bsp_btn_ble.h"
+//#include "sensorsim.h"
+//#include "nrf_gpio.h"
+//#include "ble_hci.h"
+
+
+
+#define IS_SRVC_CHANGED_CHARACT_PRESENT  1                                          /**< Include or not the service_changed characteristic. if not enabled, the server's database cannot be changed for the lifetime of the device*/
+
+#define DEVICE_NAME                      "TUT5_World"                               /**< Name of device. Will be included in the advertising data. */
+#define APP_ADV_INTERVAL                 300                                        /**< The advertising interval (in units of 0.625 ms. This value corresponds to 25 ms). */
+
+#define MIN_CONN_INTERVAL                MSEC_TO_UNITS(100, UNIT_1_25_MS)           /**< Minimum acceptable connection interval (0.1 seconds). */
+#define MAX_CONN_INTERVAL                MSEC_TO_UNITS(200, UNIT_1_25_MS)           /**< Maximum acceptable connection interval (0.2 second). */
+
+#define SEC_PARAM_BOND                   1                                          /**< Perform bonding. */
+#define SEC_PARAM_MITM                   0                                          /**< Man In The Middle protection not required. */
+#define SEC_PARAM_LESC                   0                                          /**< LE Secure Connections not enabled. */
+#define SEC_PARAM_KEYPRESS               0                                          /**< Keypress notifications not enabled. */
+#define SEC_PARAM_IO_CAPABILITIES        BLE_GAP_IO_CAPS_NONE                       /**< No I/O capabilities. */
+#define SEC_PARAM_OOB                    0                                          /**< Out Of Band data not available. */
+#define SEC_PARAM_MIN_KEY_SIZE           7                                          /**< Minimum encryption key size. */
+#define SEC_PARAM_MAX_KEY_SIZE           16                                         /**< Maximum encryption key size. */
+
+//static dm_application_instance_t         m_app_handle;                              /**< Application identifier allocated by device manager */
+#define BLE_ADV_FAST_ENABLED true
+#define BLE_ADV_FAST_DISABLED false
+#else
 #define IS_SRVC_CHANGED_CHARACT_PRESENT 0                                           /**< Include the service_changed characteristic. If not enabled, the server's database cannot be changed for the lifetime of the device. */
 
-#if (NRF_SD_BLE_API_VERSION == 3)
-#define NRF_BLE_MAX_MTU_SIZE            GATT_MTU_SIZE_DEFAULT                       /**< MTU size used in the softdevice enabling and to reply to a BLE_GATTS_EVT_EXCHANGE_MTU_REQUEST event. */
-#endif
 
-#define APP_FEATURE_NOT_SUPPORTED       BLE_GATT_STATUS_ATTERR_APP_BEGIN + 2        /**< Reply when unsupported features are requested. */
-
-#define CENTRAL_LINK_COUNT              0                                           /**< Number of central links used by the application. When changing this number remember to adjust the RAM settings*/
-#define PERIPHERAL_LINK_COUNT           1                                           /**< Number of peripheral links used by the application. When changing this number remember to adjust the RAM settings*/
 
 #define DEVICE_NAME                     "Nordic_UART"                               /**< Name of device. Will be included in the advertising data. */
 #define NUS_SERVICE_UUID_TYPE           BLE_UUID_TYPE_VENDOR_BEGIN                  /**< UUID type for the Nordic UART Service (vendor specific). */
 
 #define APP_ADV_INTERVAL                64                                          /**< The advertising interval (in units of 0.625 ms. This value corresponds to 40 ms). */
+
+#define MIN_CONN_INTERVAL               MSEC_TO_UNITS(20, UNIT_1_25_MS)             /**< Minimum acceptable connection interval (20 ms), Connection interval uses 1.25 ms units. */
+#define MAX_CONN_INTERVAL               MSEC_TO_UNITS(75, UNIT_1_25_MS)             /**< Maximum acceptable connection interval (75 ms), Connection interval uses 1.25 ms units. */
+
+#endif
+
+#if (NRF_SD_BLE_API_VERSION == 3)
+#define NRF_BLE_MAX_MTU_SIZE            GATT_MTU_SIZE_DEFAULT                       /**< MTU size used in the softdevice enabling and to reply to a BLE_GATTS_EVT_EXCHANGE_MTU_REQUEST event. */
+#endif
+#define APP_FEATURE_NOT_SUPPORTED       BLE_GATT_STATUS_ATTERR_APP_BEGIN + 2        /**< Reply when unsupported features are requested. */
+
+#define CENTRAL_LINK_COUNT              0                                           /**< Number of central links used by the application. When changing this number remember to adjust the RAM settings*/
+#define PERIPHERAL_LINK_COUNT           1                                           /**< Number of peripheral links used by the application. When changing this number remember to adjust the RAM settings*/
+
+
 #define APP_ADV_TIMEOUT_IN_SECONDS      180                                         /**< The advertising timeout (in units of seconds). */
 
 #define APP_TIMER_PRESCALER             0                                           /**< Value of the RTC1 PRESCALER register. */
 #define APP_TIMER_OP_QUEUE_SIZE         4                                           /**< Size of timer operation queues. */
 
-#define MIN_CONN_INTERVAL               MSEC_TO_UNITS(20, UNIT_1_25_MS)             /**< Minimum acceptable connection interval (20 ms), Connection interval uses 1.25 ms units. */
-#define MAX_CONN_INTERVAL               MSEC_TO_UNITS(75, UNIT_1_25_MS)             /**< Maximum acceptable connection interval (75 ms), Connection interval uses 1.25 ms units. */
 #define SLAVE_LATENCY                   0                                           /**< Slave latency. */
 #define CONN_SUP_TIMEOUT                MSEC_TO_UNITS(4000, UNIT_10_MS)             /**< Connection supervisory timeout (4 seconds), Supervision Timeout uses 10 ms units. */
+
 #define FIRST_CONN_PARAMS_UPDATE_DELAY  APP_TIMER_TICKS(5000, APP_TIMER_PRESCALER)  /**< Time from initiating event (connect or start of notification) to first time sd_ble_gap_conn_param_update is called (5 seconds). */
 #define NEXT_CONN_PARAMS_UPDATE_DELAY   APP_TIMER_TICKS(30000, APP_TIMER_PRESCALER) /**< Time between each call to sd_ble_gap_conn_param_update after the first call (30 seconds). */
 #define MAX_CONN_PARAMS_UPDATE_COUNT    3                                           /**< Number of attempts before giving up the connection parameter negotiation. */
@@ -70,14 +123,27 @@
 
 #define UART_TX_BUF_SIZE                256                                         /**< UART TX buffer size. */
 #define UART_RX_BUF_SIZE                256                                         /**< UART RX buffer size. */
+#ifdef NUS_TEST
 
 static ble_nus_t m_nus; /**< Structure to identify the Nordic UART Service. */
-static uint16_t m_conn_handle = BLE_CONN_HANDLE_INVALID; /**< Handle of the current connection. */
-
 static ble_uuid_t m_adv_uuids[] = { { BLE_UUID_NUS_SERVICE,
         NUS_SERVICE_UUID_TYPE } }; /**< Universally unique service identifier. */
+#else
+#define BLE_NUS_MAX_DATA_LEN 15 /**< maximum UART BUFFER
+//static ble_uuid_t m_adv_uuids[] = {}; /**< Universally unique service identifier. */
+#endif
+static uint16_t m_conn_handle = BLE_CONN_HANDLE_INVALID; /**< Handle of the current connection. */
+
+
 
 typedef uint32_t testErr_t;
+
+enum advEndCond
+{    endOnTimeout,
+    endOnScanReq
+};
+
+typedef uint32_t advEndCond_t;
 
 /**@brief Function for assert macro callback.
  *
@@ -156,6 +222,7 @@ static void gap_params_init(void) {
     APP_ERROR_CHECK(err_code);
 }
 
+#ifdef NUS_TEST
 /**@brief Function for handling the data from the Nordic UART Service.
  *
  * @details This function will process the data received from the Nordic UART BLE Service and send
@@ -192,7 +259,7 @@ static void services_init(void) {
     err_code = ble_nus_init(&m_nus, &nus_init);
     APP_ERROR_CHECK(err_code);
 }
-
+#endif
 /**@brief Function for handling an event from the Connection Parameters Module.
  *
  * @details This function will be called for all events in the Connection Parameters Module
@@ -277,6 +344,7 @@ static void on_adv_evt(ble_adv_evt_t ble_adv_evt) {
     case BLE_ADV_EVT_IDLE:
         sleep_mode_enter();
         break;
+        // TODO add ble state indications
     default:
         break;
     }
@@ -320,6 +388,8 @@ static void on_ble_evt(ble_evt_t * p_ble_evt) {
         err_code = sd_ble_gap_disconnect(p_ble_evt->evt.gattc_evt.conn_handle,
         BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
         APP_ERROR_CHECK(err_code);
+        // TODO add timeout test ack for client
+
         break; // BLE_GATTC_EVT_TIMEOUT
 
     case BLE_GATTS_EVT_TIMEOUT:
@@ -327,6 +397,8 @@ static void on_ble_evt(ble_evt_t * p_ble_evt) {
         err_code = sd_ble_gap_disconnect(p_ble_evt->evt.gatts_evt.conn_handle,
         BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
         APP_ERROR_CHECK(err_code);
+        // TODO add timeout test ack for client
+
         break; // BLE_GATTS_EVT_TIMEOUT
 
     case BLE_EVT_USER_MEM_REQUEST:
@@ -385,7 +457,7 @@ static void on_ble_evt(ble_evt_t * p_ble_evt) {
  */
 static void ble_evt_dispatch(ble_evt_t * p_ble_evt) {
     ble_conn_params_on_ble_evt(p_ble_evt);
-    ble_nus_on_ble_evt(&m_nus, p_ble_evt);
+   // ble_nus_on_ble_evt(&m_nus, p_ble_evt);
     on_ble_evt(p_ble_evt);
     ble_advertising_on_ble_evt(p_ble_evt);
     bsp_btn_ble_on_ble_evt(p_ble_evt);
@@ -396,7 +468,7 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt) {
  *
  * @details This function initializes the SoftDevice and the BLE event interrupt.
  */
-static void ble_stack_init(void) {
+static void test_ble_stack_init(ble_enable_params_t* ble_enable_params) {
     uint32_t err_code;
 
     nrf_clock_lf_cfg_t clock_lf_cfg = NRF_CLOCK_LFCLKSRC;
@@ -404,9 +476,8 @@ static void ble_stack_init(void) {
     // Initialize SoftDevice.
     SOFTDEVICE_HANDLER_INIT(&clock_lf_cfg, NULL);
 
-    ble_enable_params_t ble_enable_params;
     err_code = softdevice_enable_get_default_config(CENTRAL_LINK_COUNT,
-    PERIPHERAL_LINK_COUNT, &ble_enable_params);
+    PERIPHERAL_LINK_COUNT, ble_enable_params);
     APP_ERROR_CHECK(err_code);
 
     //Check the ram settings against the used number of links
@@ -414,14 +485,8 @@ static void ble_stack_init(void) {
 
     // Enable BLE stack.
 #if (NRF_SD_BLE_API_VERSION == 3)
-    //   ble_enable_params.gatt_enable_params.att_mtu = NRF_BLE_MAX_MTU_SIZE;
+    ble_enable_params->gatt_enable_params.att_mtu= NRF_BLE_MAX_MTU_SIZE;
 #endif
-    // err_code = softdevice_enable(&ble_enable_params);
-    //  APP_ERROR_CHECK(err_code);
-
-    // Subscribe for BLE events.
-    // err_code = softdevice_ble_evt_handler_set(ble_evt_dispatch);
-    // APP_ERROR_CHECK(err_code);
 }
 
 /**@brief Function for handling events from the BSP module.
@@ -464,10 +529,7 @@ static unsigned int ts_parse_input(uint8_t p_data[], uint8_t index) {
         while (app_uart_put(p_data[i]) != NRF_SUCCESS)
             ;
     }
-    while (app_uart_put('\r') != NRF_SUCCESS)
-        ;
-    while (app_uart_put('\n') != NRF_SUCCESS)
-        ;
+    while (app_uart_put('\r') != NRF_SUCCESS);
 
     return error_code;
 }
@@ -491,11 +553,11 @@ void uart_event_handle(app_uart_evt_t * p_event) {
 
         if ((data_array[index - 1] == '\n')
                 || (index >= (BLE_NUS_MAX_DATA_LEN))) {
-#ifdef NUS_TEST
-            err_code = ble_nus_string_send(&m_nus, data_array, index);
-#else
+//#ifdef NUS_TEST
+//            err_code = ble_nus_string_send(&m_nus, data_array, index);
+//#else
             err_code = ts_parse_input(data_array, index);
-#endif
+//#endif
             if (err_code != NRF_ERROR_INVALID_STATE) {
                 APP_ERROR_CHECK(err_code);
             }
@@ -531,7 +593,12 @@ static void uart_init(void) {
     UART_BAUDRATE_BAUDRATE_Baud115200 };
 
     APP_UART_FIFO_INIT(&comm_params, UART_RX_BUF_SIZE, UART_TX_BUF_SIZE,
-            uart_error_handle, APP_IRQ_PRIORITY_LOW, err_code);
+#ifdef NUS_TEST
+            uart_error_handle,
+#else
+            uart_event_handle,
+#endif
+            APP_IRQ_PRIORITY_LOW, err_code);
     APP_ERROR_CHECK(err_code);
 }
 /**@snippet [UART Initialization] */
@@ -551,17 +618,24 @@ static void advertising_init(void) {
     advdata.flags = BLE_GAP_ADV_FLAGS_LE_ONLY_LIMITED_DISC_MODE;
 
     memset(&scanrsp, 0, sizeof(scanrsp));
+#ifdef NUS_TEST
     scanrsp.uuids_complete.uuid_cnt = sizeof(m_adv_uuids)
             / sizeof(m_adv_uuids[0]);
-    scanrsp.uuids_complete.p_uuids = m_adv_uuids;
 
+    scanrsp.uuids_complete.p_uuids = m_adv_uuids;
+#endif
     memset(&options, 0, sizeof(options));
     options.ble_adv_fast_enabled = true;
     options.ble_adv_fast_interval = APP_ADV_INTERVAL;
     options.ble_adv_fast_timeout = APP_ADV_TIMEOUT_IN_SECONDS;
-
+#ifdef NUS_TEST
     err_code = ble_advertising_init(&advdata, &scanrsp, &options, on_adv_evt,
             NULL);
+#else
+    err_code = ble_advertising_init(&advdata, NULL, &options, on_adv_evt,
+             NULL);
+
+#endif
     APP_ERROR_CHECK(err_code);
 }
 
@@ -589,33 +663,52 @@ static void power_manage(void) {
     APP_ERROR_CHECK(err_code);
 }
 
-static testErr_t test_startSoftDevice(ble_enable_params_t *ble_enable_params) {
-
-    testErr_t err_code = 0;
-
-    err_code = softdevice_enable(ble_enable_params);
-    APP_ERROR_CHECK(err_code);
-
-    // Subscribe for BLE events.
-    err_code = softdevice_ble_evt_handler_set(ble_evt_dispatch);
-    APP_ERROR_CHECK(err_code);
-
-}
-
 static testErr_t test_stopSoftDevice() {
     testErr_t err_code = NRF_SUCCESS;
 
     return err_code;
 }
 
-static testErr_t test_startAdvertising(){
+static testErr_t test_startAdvertising(advEndCond_t endCondition){
     testErr_t err_code = NRF_SUCCESS;
+    // TODO Initialize for non connectable
+
+
+    // TODO start advertising
+
+    // TODO Wait for timeout scan received or timeout condition
+    if(endCondition ==  endOnScanReq){
+//        if(bleAdvState != )
+//        err_code = 11;
+
+    }else{
+
+
+
+    }
 
     return err_code;
 }
 
-static
-static testErr_t test_initialize(ble_enable_params_t *ble_enable_params) {
+
+static void test_startSoftDevice(ble_enable_params_t* ble_enable_params){
+     testErr_t err_code;
+     // Enable BLE stack.
+
+     err_code = softdevice_enable(ble_enable_params);
+     APP_ERROR_CHECK(err_code);
+
+//     Subscribe for BLE events.
+     err_code = softdevice_ble_evt_handler_set(ble_evt_dispatch);
+     APP_ERROR_CHECK(err_code);
+
+     // Register with the SoftDevice handler module for BLE events.
+   //  err_code = softdevice_sys_evt_handler_set(sys_evt_dispatch);
+     APP_ERROR_CHECK(err_code);
+
+}
+
+static void test_initialize(ble_enable_params_t *ble_enable_params) {
     testErr_t err_code;
 
     // Initialize.
@@ -632,15 +725,151 @@ static testErr_t test_initialize(ble_enable_params_t *ble_enable_params) {
 
     //Check the ram settings against the used number of links
     CHECK_RAM_START_ADDR(CENTRAL_LINK_COUNT,PERIPHERAL_LINK_COUNT);
-
-    // Enable BLE stack.
-#if (NRF_SD_BLE_API_VERSION == 3)
-    ble_enable_params->gatt_enable_params.att_mtu = NRF_BLE_MAX_MTU_SIZE;
-#endif
+    APP_ERROR_CHECK(err_code);
 
     return err_code;
 
 }
+
+#ifdef TEST_TUT5
+void test_tut5ble(void){
+    testErr_t err_code = 0 ;
+
+    ble_gap_addr_t gap_address;
+    gap_address.addr_type = BLE_GAP_ADDR_TYPE_RANDOM_STATIC; //BLE_GAP_ADDR_TYPE_RANDOM_PRIVATE_RESOLVABLE;
+    //err_code = sd_ble_gap_address_set(BLE_GAP_ADDR_CYCLE_MODE_AUTO, &gap_address); //TODO where can i set this addres
+    sd_ble_gap_addr_set(&gap_address);
+}
+
+
+void test_tut5_gap_params_init(void){
+    uint32_t                err_code;
+
+    // Declearing parameter structs. Try to go to the struct definitions to get
+    // more information about what parameters they contain
+    ble_gap_conn_params_t   gap_conn_params;    // Struct to store GAP connection parameters like max min connection interval etc
+    ble_gap_conn_sec_mode_t sec_mode;           // Struct to store security parameters
+
+    // A simple macro that sets the Security Mode and Level bits in sec_mode
+    // to require no protection (open link)
+    BLE_GAP_CONN_SEC_MODE_SET_OPEN(&sec_mode);
+
+    // Store the device name and security mode in the SoftDevice. Our name is defined to "HelloWorld" in the beginning of this file
+    err_code = sd_ble_gap_device_name_set(&sec_mode,
+                                          (const uint8_t *)DEVICE_NAME,
+                                          strlen(DEVICE_NAME));
+    APP_ERROR_CHECK(err_code); // Check for errors
+
+    // Always initialize all fields in structs to zero or you might get unexpected behaviour
+    memset(&gap_conn_params, 0, sizeof(gap_conn_params));
+
+    // Populate the GAP connection parameter struct
+    gap_conn_params.min_conn_interval = MIN_CONN_INTERVAL;
+    gap_conn_params.max_conn_interval = MAX_CONN_INTERVAL;
+    gap_conn_params.slave_latency     = SLAVE_LATENCY;
+    gap_conn_params.conn_sup_timeout  = CONN_SUP_TIMEOUT;
+
+    // Set GAP Peripheral Preferred Connection Parameters
+    // The device use these prefered values when negotiating connection terms with another device
+    err_code = sd_ble_gap_ppcp_set(&gap_conn_params);
+    APP_ERROR_CHECK(err_code);
+
+    // Set appearence
+    sd_ble_gap_appearance_set(0);
+    APP_ERROR_CHECK(err_code);// Check for errors
+
+}
+
+void test_tut5_advertising_init(void)
+{
+    uint32_t      err_code;
+    ble_advdata_t advdata;
+
+    ble_advdata_manuf_data_t        manuf_data; // Variable to hold manufacturer specific data
+    uint8_t data[]                      = "HW_TEST"; // Our data to adverise
+    manuf_data.company_identifier       = 0x0059; // Nordics company ID
+    manuf_data.data.p_data              = data;
+    manuf_data.data.size                = sizeof(data);
+
+
+    // Build advertising data struct to pass into @ref ble_advertising_init.
+    memset(&advdata, 0, sizeof(advdata));
+
+    //advdata.name_type               = BLE_ADVDATA_FULL_NAME;
+    advdata.name_type = BLE_ADVDATA_SHORT_NAME; // Use a shortened name
+    advdata.short_name_len = 4;
+    advdata.flags                   = BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE;
+    advdata.p_manuf_specific_data = &manuf_data;
+    int8_t tx_powerlelve = -13;
+    advdata.p_tx_power_level =  &tx_powerlelve;
+    advdata.include_appearance = true;
+    sd_ble_gap_appearance_set(BLE_APPEARANCE_HID_MOUSE);
+
+    // Prepare the scan response Manufacturer specific data packet
+        ble_advdata_manuf_data_t                manuf_data_response;
+        uint8_t                                 data_response[] = "Many_bytes_of_data"; // Remember there is a 0 terminator at the end of string
+        manuf_data_response.company_identifier       = 0x0059;
+        manuf_data_response.data.p_data              = data_response;
+        manuf_data_response.data.size                = sizeof(data_response);
+
+        ble_advdata_t   advdata_response;// Declare and populate a scan response packet
+
+        // Always initialize all fields in structs to zero or you might get unexpected behaviour
+        memset(&advdata_response, 0, sizeof(advdata_response));
+        // Populate the scan response packet
+        advdata_response.name_type               = BLE_ADVDATA_NO_NAME;
+        advdata_response.p_manuf_specific_data   = &manuf_data_response;
+
+
+
+    ble_adv_modes_config_t options = {0};
+    options.ble_adv_fast_enabled  = BLE_ADV_FAST_ENABLED;
+    options.ble_adv_fast_interval = APP_ADV_INTERVAL;
+    options.ble_adv_fast_timeout  = APP_ADV_TIMEOUT_IN_SECONDS;
+
+    err_code = ble_advertising_init(&advdata, &advdata_response, &options, on_adv_evt, NULL);
+    APP_ERROR_CHECK(err_code);
+
+   // ble_gap_adv_params_t
+}
+
+
+void test_tut5_conn_params_init(void)
+{
+    uint32_t               err_code;
+    ble_conn_params_init_t cp_init;
+
+    memset(&cp_init, 0, sizeof(cp_init));
+
+    cp_init.p_conn_params                  = NULL;
+    cp_init.first_conn_params_update_delay = FIRST_CONN_PARAMS_UPDATE_DELAY;
+    cp_init.next_conn_params_update_delay  = NEXT_CONN_PARAMS_UPDATE_DELAY;
+    cp_init.max_conn_params_update_count   = MAX_CONN_PARAMS_UPDATE_COUNT;
+    cp_init.start_on_notify_cccd_handle    = BLE_GATT_HANDLE_INVALID;
+    cp_init.disconnect_on_fail             = false;
+    cp_init.evt_handler                    = on_conn_params_evt;
+    cp_init.error_handler                  = conn_params_error_handler;
+
+    err_code = ble_conn_params_init(&cp_init);
+    APP_ERROR_CHECK(err_code);
+}
+
+void test_tut5main(){
+
+    testErr_t err_code;
+
+    test_tut5_gap_params_init();
+    test_tut5_advertising_init();
+    test_tut5_conn_params_init();
+
+    // Start execution.
+    err_code = ble_advertising_start(BLE_ADV_MODE_FAST);
+
+
+    APP_ERROR_CHECK(err_code);
+}
+
+#endif
 /**@brief Application main function.
  */
 int main(void) {
@@ -649,12 +878,14 @@ int main(void) {
 
     ble_enable_params_t ble_enable_params;
 
-    err_code = test_initialize(&ble_enable_params)
-    APP_ERROR_CHECK(err_code);
+    test_initialize(&ble_enable_params);
 
     uart_init();
-    /* buttons_leds_init(&erase_bonds);
-     ble_stack_init();
+
+    buttons_leds_init(&erase_bonds);
+
+    /*
+   //  ble_stack_init();
      gap_params_init();
      services_init();
      advertising_init();
@@ -662,6 +893,21 @@ int main(void) {
 
      err_code = ble_advertising_start(BLE_ADV_MODE_FAST);
      APP_ERROR_CHECK(err_code);*/
+
+
+    //est_ble_stack_init(&ble_enable_params); already done in test_init
+    test_startSoftDevice(&ble_enable_params);
+
+    test_tut5main();
+/*
+    gap_params_init();
+    services_init();
+    advertising_init();
+    conn_params_init();
+
+    err_code = ble_advertising_start(BLE_ADV_MODE_FAST);
+    APP_ERROR_CHECK(err_code);
+    */
 
     printf("\r\nUART Start!\r\n");
     // Enter main loop.
